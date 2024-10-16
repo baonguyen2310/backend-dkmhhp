@@ -5,7 +5,7 @@ const app = express();
 const authRoutes = require('./routes/authRoutes');
 const courseRoutes = require('./routes/courseRoutes');
 const feeRoutes = require('./routes/feeRoutes');
-const registrationRoutes = require('./routes/registrationRoutes');
+const courseRegistrationRoutes = require('./routes/courseRegistrationRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const { authenticateToken, authorizeRoles } = require('./middlewares/authMiddleware');
 
@@ -24,8 +24,8 @@ app.use(authenticateToken);
 // Use routes with role-based authorization
 app.use('/api/courses', authorizeRoles('admin', 'academic affairs staff'), courseRoutes);
 app.use('/api/fees', authorizeRoles('admin', 'accounting staff'), feeRoutes);
-app.use('/api/registrations', authorizeRoles('admin', 'academic affairs staff'), registrationRoutes);
 app.use('/api/students', authorizeRoles('admin', 'academic affairs staff'), studentRoutes);
+app.use('/api/course-registrations', authorizeRoles('admin', 'academic affairs staff'), courseRegistrationRoutes);
 
 // Basic error handling middleware
 app.use((err, req, res, next) => {

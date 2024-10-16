@@ -16,6 +16,10 @@ class CourseController {
   static async addCourse(req, res) {
     try {
       const course = req.body;
+      if (!course.course_id) {
+        return res.status(400).json({ message: 'Course ID is required' });
+      }
+      
       const result = await CourseModel.addCourse(course);
       if (result > 0) {
         res.status(201).json({ message: 'Course added successfully' });
@@ -24,7 +28,7 @@ class CourseController {
       }
     } catch (error) {
       console.error('Error adding course:', error);
-      res.status(500).json({ message: 'Error adding course' });
+      res.status(500).json({ message: 'Error adding course', error: error.message });
     }
   }
 
@@ -57,7 +61,11 @@ class CourseController {
       }
     } catch (error) {
       console.error('Error deleting course:', error);
-      res.status(500).json({ message: 'Error deleting course' });
+      if (error.message.includes('Cannot delete course')) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: 'Error deleting course' });
+      }
     }
   }
 }

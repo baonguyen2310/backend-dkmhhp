@@ -14,4 +14,7 @@ router.put('/:id', FeeController.updateFee);
 // Xóa một khoản học phí
 router.delete('/:id', FeeController.deleteFee);
 
+router.get('/unpaid-students/:semesterId', FeeController.getUnpaidStudents);
+router.post('/send-unpaid-report/:semesterId', FeeController.sendUnpaidStudentsReport);
+
 module.exports = router;

@@ -163,3 +163,8 @@ CREATE TABLE UserRoles (
     FOREIGN KEY (role_id) REFERENCES Roles(role_id),
     UNIQUE (user_id, role_id) -- Ensure a user cannot have the same role twice
 );
+
+-- Thêm các cột mới vào bảng Semesters
+ALTER TABLE Semesters
+ADD payment_deadline DATETIME,
+    early_payment_deadline DATETIME;

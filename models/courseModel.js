@@ -24,13 +24,14 @@ class CourseModel {
         .input('credits_num', sql.Int, course.credits_num)
         .input('lesson_num', sql.Int, course.lesson_num)
         .input('course_type', sql.NVarChar, course.course_type)
+        .input('department_id', sql.NVarChar, course.department_id)
         .query(`
-          INSERT INTO Course (course_id, course_name, credits_num, lesson_num, course_type)
-          VALUES (@course_id, @course_name, @credits_num, @lesson_num, @course_type)
+          INSERT INTO Course (course_id, course_name, credits_num, lesson_num, course_type, department_id)
+          VALUES (@course_id, @course_name, @credits_num, @lesson_num, @course_type, @department_id)
         `);
       return result.rowsAffected;
     } catch (error) {
-      console.error('Error adding course:', error);
+      console.error('Database error:', error);
       throw error;
     }
   }
@@ -45,9 +46,10 @@ class CourseModel {
         .input('credits_num', sql.Int, course.credits_num)
         .input('lesson_num', sql.Int, course.lesson_num)
         .input('course_type', sql.NVarChar, course.course_type)
+        .input('department_id', sql.NVarChar, course.department_id)
         .query(`
           UPDATE Course
-          SET course_name = @course_name, credits_num = @credits_num, lesson_num = @lesson_num, course_type = @course_type
+          SET course_name = @course_name, credits_num = @credits_num, lesson_num = @lesson_num, course_type = @course_type, department_id = @department_id
           WHERE course_id = @course_id
         `);
       return result.rowsAffected;
