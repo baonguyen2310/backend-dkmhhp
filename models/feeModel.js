@@ -52,30 +52,76 @@ class FeeModel {
         }
       }
 
-      // 5. Áp dụng giảm giá cho đối tượng ưu tiên
-      const priorityDiscount = await this.getPriorityDiscount(studentId, totalTuitionFee);
-
-      // 6. Lưu thông tin học phí vào bảng Tuition_Fees
-      const result = await pool.request()
+      // 5. Áp dụng giảm giá học phí
+      const discountResult = await pool.request()
         .input('student_id', sql.NVarChar, studentId)
-        .input('semester_id', sql.Int, semesterId)
-        .input('total_credits', sql.Int, totalCredits)
-        .input('tuition_fee', sql.Decimal(18, 2), totalTuitionFee)
-        .input('discount', sql.Decimal(18, 2), priorityDiscount)
-        .input('payment_status', sql.NVarChar, 'Unpaid')
         .query(`
-          INSERT INTO Tuition_Fees (student_id, semester_id, total_credits, tuition_fee, discount, amount_paid, payment_status)
-          OUTPUT INSERTED.fee_id
-          VALUES (@student_id, @semester_id, @total_credits, @tuition_fee, @discount, 0, @payment_status)
+          SELECT fd.discount_percent
+          FROM Students s
+          JOIN Fee_Discounts fd ON s.discount_id = fd.discount_id
+          WHERE s.student_id = @student_id
         `);
 
-      const feeId = result.recordset[0].fee_id;
+      let discountPercent = 0;
+      if (discountResult.recordset.length > 0) {
+        discountPercent = discountResult.recordset[0].discount_percent;
+      }
+
+      const discountAmount = totalTuitionFee * (discountPercent / 100);
+      const finalTuitionFee = totalTuitionFee - discountAmount;
+
+      // Kiểm tra xem đã có bản ghi học phí cho sinh viên và học kỳ này chưa
+      const existingFee = await pool.request()
+        .input('student_id', sql.NVarChar, studentId)
+        .input('semester_id', sql.Int, semesterId)
+        .query(`
+          SELECT fee_id FROM Tuition_Fees
+          WHERE student_id = @student_id AND semester_id = @semester_id
+        `);
+
+      let feeId;
+
+      if (existingFee.recordset.length > 0) {
+        // Nếu đã tồn tại, cập nhật bản ghi này
+        feeId = existingFee.recordset[0].fee_id;
+        await pool.request()
+          .input('fee_id', sql.Int, feeId)
+          .input('total_credits', sql.Int, totalCredits)
+          .input('tuition_fee', sql.Decimal(18, 2), finalTuitionFee)
+          .input('discount', sql.Decimal(18, 2), discountAmount)
+          .query(`
+            UPDATE Tuition_Fees
+            SET total_credits = @total_credits,
+                tuition_fee = @tuition_fee,
+                discount = @discount
+            WHERE fee_id = @fee_id
+          `);
+      } else {
+        // Nếu chưa tồn tại, thêm bản ghi mới
+        const result = await pool.request()
+          .input('student_id', sql.NVarChar, studentId)
+          .input('semester_id', sql.Int, semesterId)
+          .input('total_credits', sql.Int, totalCredits)
+          .input('tuition_fee', sql.Decimal(18, 2), finalTuitionFee)
+          .input('discount', sql.Decimal(18, 2), discountAmount)
+          .input('payment_status', sql.NVarChar, 'Unpaid')
+          .query(`
+            INSERT INTO Tuition_Fees (student_id, semester_id, total_credits, tuition_fee, discount, amount_paid, payment_status)
+            OUTPUT INSERTED.fee_id
+            VALUES (@student_id, @semester_id, @total_credits, @tuition_fee, @discount, 0, @payment_status)
+          `);
+
+        if (result.recordset.length === 0 || !result.recordset[0].fee_id) {
+          throw new Error('Failed to insert tuition fee record');
+        }
+        feeId = result.recordset[0].fee_id;
+      }
 
       return {
         feeId,
         totalCredits,
-        tuitionFee: totalTuitionFee,
-        priorityDiscount,
+        tuitionFee: finalTuitionFee,
+        discount: discountAmount,
         paymentStatus: 'Unpaid'
       };
     } catch (error) {
@@ -106,7 +152,8 @@ class FeeModel {
       const { tuition_fee, discount, amount_paid, payment_status, payment_deadline, early_payment_deadline } = feeInfo.recordset[0];
 
       // Kiểm tra xem có phải là thanh toán đủ và sớm không
-      const isFullPayment = amount >= (tuition_fee - discount - amount_paid);
+      const remainingBalance = tuition_fee - discount - amount_paid;
+      const isFullPayment = amount >= remainingBalance;
       const isEarlyPayment = new Date(paymentDate) <= new Date(early_payment_deadline);
 
       let earlyPaymentDiscount = 0;
@@ -134,10 +181,12 @@ class FeeModel {
         .input('fee_id', sql.NVarChar, feeId)
         .input('amount_paid', sql.Decimal(18, 2), newAmountPaid)
         .input('payment_status', sql.NVarChar, newPaymentStatus)
+        .input('early_payment_discount', sql.Decimal(18, 2), earlyPaymentDiscount)
         .query(`
           UPDATE Tuition_Fees
           SET amount_paid = @amount_paid, 
-              payment_status = @payment_status
+              payment_status = @payment_status,
+              discount = discount + @early_payment_discount
           WHERE fee_id = @fee_id
         `);
 
@@ -247,11 +296,10 @@ class FeeModel {
     }
   }
 
-  static async getUnpaidStudents(semesterId) {
+  static async getUnpaidStudents() {
     try {
       const pool = await sql.connect(dbConfig);
       const result = await pool.request()
-        .input('semester_id', sql.Int, semesterId)
         .query(`
           SELECT 
             s.student_id, 
@@ -259,11 +307,12 @@ class FeeModel {
             s.last_name, 
             tf.tuition_fee, 
             tf.amount_paid, 
-            (tf.tuition_fee - tf.amount_paid) as remaining_balance
+            (tf.tuition_fee - tf.amount_paid) as remaining_balance,
+            tf.semester_id
           FROM Students s
           JOIN Tuition_Fees tf ON s.student_id = tf.student_id
-          WHERE tf.semester_id = @semester_id AND tf.payment_status != 'Paid'
-          ORDER BY s.last_name, s.first_name
+          WHERE tf.payment_status != 'Paid'
+          ORDER BY tf.semester_id DESC, s.last_name, s.first_name
         `);
       return result.recordset;
     } catch (error) {
@@ -293,6 +342,74 @@ class FeeModel {
         `);
     } catch (error) {
       console.error('Error updating fee after payment:', error);
+      throw error;
+    }
+  }
+
+  static async processPayment(feeId, amountPaid) {
+    try {
+      const pool = await sql.connect(dbConfig);
+
+      // Lấy thông tin về học phí và thời hạn thanh toán
+      const feeInfo = await pool.request()
+        .input('fee_id', sql.NVarChar, feeId)
+        .query(`
+          SELECT tf.fee_id, tf.student_id, tf.tuition_fee, tf.discount, tf.amount_paid, tf.payment_status, 
+                 s.payment_deadline, s.early_payment_deadline
+          FROM Tuition_Fees tf
+          JOIN Semesters s ON tf.semester_id = s.semester_id
+          WHERE tf.fee_id = @fee_id
+        `);
+
+      if (feeInfo.recordset.length === 0) {
+        throw new Error('Fee record not found');
+      }
+
+      const { tuition_fee, discount, amount_paid, payment_deadline, early_payment_deadline } = feeInfo.recordset[0];
+
+      const remainingBalance = tuition_fee - discount - amount_paid;
+      const isFullPayment = amountPaid >= remainingBalance;
+      const isEarlyPayment = new Date() <= new Date(early_payment_deadline);
+
+      let earlyPaymentDiscount = 0;
+      let actualAmountPaid = 0;
+
+      if (isFullPayment && isEarlyPayment && amount_paid === 0) {
+        // Chỉ áp dụng giảm giá nếu là thanh toán đầy đủ, sớm và là lần thanh toán đầu tiên
+        earlyPaymentDiscount = tuition_fee * 0.05; // 5% discount
+        actualAmountPaid = Math.min(amountPaid, tuition_fee - discount - earlyPaymentDiscount);
+      } else {
+        // Trong các trường hợp khác, chỉ nhận số tiền cần thiết
+        actualAmountPaid = Math.min(amountPaid, remainingBalance);
+      }
+
+      const newAmountPaid = amount_paid + actualAmountPaid;
+      const newPaymentStatus = newAmountPaid >= (tuition_fee - discount - earlyPaymentDiscount) ? 'Paid' : 'Partially Paid';
+
+      // Cập nhật bảng Tuition_Fees
+      await pool.request()
+        .input('fee_id', sql.NVarChar, feeId)
+        .input('amount_paid', sql.Decimal(18, 2), newAmountPaid)
+        .input('payment_status', sql.NVarChar, newPaymentStatus)
+        .input('early_payment_discount', sql.Decimal(18, 2), earlyPaymentDiscount)
+        .query(`
+          UPDATE Tuition_Fees
+          SET amount_paid = @amount_paid, 
+              payment_status = @payment_status,
+              discount = discount + @early_payment_discount
+          WHERE fee_id = @fee_id
+        `);
+
+      return {
+        amountPaid: actualAmountPaid,
+        newTotalPaid: newAmountPaid,
+        earlyPaymentDiscount,
+        newPaymentStatus,
+        isEarlyPayment: isFullPayment && isEarlyPayment && amount_paid === 0,
+        remainingBalance: tuition_fee - discount - newAmountPaid - earlyPaymentDiscount
+      };
+    } catch (error) {
+      console.error('Error processing payment:', error);
       throw error;
     }
   }

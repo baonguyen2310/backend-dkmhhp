@@ -35,7 +35,7 @@ class CourseRegistrationModel {
         .input('student_id', sql.NVarChar, registration.student_id)
         .input('course_id', sql.NVarChar, registration.course_id)
         .input('semester_id', sql.Int, registration.semester_id)
-        .input('registration_status', sql.NVarChar, 'Registered')
+        .input('registration_status', sql.NVarChar, registration.registration_status)
         .query(`
           INSERT INTO Course_Registration (student_id, course_id, semester_id, registration_status)
           OUTPUT INSERTED.registration_id
@@ -104,32 +104,25 @@ class CourseRegistrationModel {
     }
   }
 
-  static async updateCourseRegistration(registrationId, newStatus) {
+  static async updateCourseRegistration(registrationId, registration) {
     try {
-      if (!registrationId || isNaN(registrationId)) {
-        throw new Error('Invalid registration ID');
-      }
-
-      const editPeriodCheck = await this.checkEditPeriod(registrationId);
-      if (!editPeriodCheck.success) {
-        throw new Error(editPeriodCheck.message);
-      }
-
       const pool = await sql.connect(dbConfig);
       const result = await pool.request()
         .input('registration_id', sql.Int, registrationId)
-        .input('new_status', sql.NVarChar, newStatus)
+        .input('student_id', sql.NVarChar, registration.student_id)
+        .input('course_id', sql.NVarChar, registration.course_id)
+        .input('semester_id', sql.Int, registration.semester_id)
+        .input('registration_status', sql.NVarChar, registration.registration_status)
         .query(`
           UPDATE Course_Registration
-          SET registration_status = @new_status
+          SET student_id = @student_id,
+              course_id = @course_id,
+              semester_id = @semester_id,
+              registration_status = @registration_status
           WHERE registration_id = @registration_id
         `);
-
-      if (result.rowsAffected[0] === 0) {
-        throw new Error('Course registration not found');
-      }
-
-      return { success: true, message: 'Course registration updated successfully' };
+      
+      return result.rowsAffected[0];
     } catch (error) {
       console.error('Error updating course registration:', error);
       throw error;
@@ -192,14 +185,15 @@ class CourseRegistrationModel {
         .input('student_id', sql.NVarChar, studentId)
         .input('semester_id', sql.Int, semesterId)
         .query(`
-          SELECT COUNT(*) as total, SUM(CASE WHEN registration_status = 'Confirmed' THEN 1 ELSE 0 END) as confirmed
+          SELECT COUNT(*) as count
           FROM Course_Registration
-          WHERE student_id = @student_id AND semester_id = @semester_id
+          WHERE student_id = @student_id 
+            AND semester_id = @semester_id 
+            AND registration_status != 'Confirmed'
         `);
-      const { total, confirmed } = result.recordset[0];
-      return total === confirmed && total > 0;
+      return result.recordset[0].count === 0;
     } catch (error) {
-      console.error('Error checking registrations:', error);
+      console.error('Error checking registrations confirmation:', error);
       throw error;
     }
   }
@@ -252,7 +246,7 @@ class CourseRegistrationModel {
   static async finalizeCourseRegistrations(studentId, semesterId) {
     try {
       const pool = await sql.connect(dbConfig);
-      
+
       // Kiểm tra xem tất cả các đăng ký đã được xác nhận chưa
       const allConfirmed = await this.checkAllRegistrationsConfirmed(studentId, semesterId);
       if (!allConfirmed) {
@@ -271,6 +265,45 @@ class CourseRegistrationModel {
 
       // Tính toán học phí
       const feeCalculation = await FeeModel.calculateTuitionFee(studentId, semesterId);
+
+      // Kiểm tra xem đã có bản ghi học phí chưa
+      const existingFee = await pool.request()
+        .input('student_id', sql.NVarChar, studentId)
+        .input('semester_id', sql.Int, semesterId)
+        .query(`
+          SELECT fee_id FROM Tuition_Fees
+          WHERE student_id = @student_id AND semester_id = @semester_id
+        `);
+
+      if (existingFee.recordset.length === 0) {
+        // Nếu chưa có, tạo mới bản ghi học phí
+        await pool.request()
+          .input('student_id', sql.NVarChar, studentId)
+          .input('semester_id', sql.Int, semesterId)
+          .input('total_credits', sql.Int, feeCalculation.totalCredits)
+          .input('tuition_fee', sql.Decimal(18, 2), feeCalculation.tuitionFee)
+          .input('discount', sql.Decimal(18, 2), feeCalculation.discount)
+          .input('payment_status', sql.NVarChar, 'Unpaid')
+          .query(`
+            INSERT INTO Tuition_Fees (student_id, semester_id, total_credits, tuition_fee, discount, amount_paid, payment_status)
+            VALUES (@student_id, @semester_id, @total_credits, @tuition_fee, @discount, 0, @payment_status)
+          `);
+      } else {
+        // Nếu đã có, cập nhật bản ghi học phí
+        await pool.request()
+          .input('student_id', sql.NVarChar, studentId)
+          .input('semester_id', sql.Int, semesterId)
+          .input('total_credits', sql.Int, feeCalculation.totalCredits)
+          .input('tuition_fee', sql.Decimal(18, 2), feeCalculation.tuitionFee)
+          .input('discount', sql.Decimal(18, 2), feeCalculation.discount)
+          .query(`
+            UPDATE Tuition_Fees
+            SET total_credits = @total_credits,
+                tuition_fee = @tuition_fee,
+                discount = @discount
+            WHERE student_id = @student_id AND semester_id = @semester_id
+          `);
+      }
 
       return feeCalculation;
     } catch (error) {

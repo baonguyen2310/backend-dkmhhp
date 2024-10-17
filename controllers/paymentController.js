@@ -5,9 +5,16 @@ class PaymentController {
   static validatePayment(payment) {
     const errors = [];
     if (!payment.fee_id) errors.push('Fee ID is required');
-    if (!payment.payment_date) errors.push('Payment date is required');
-    if (typeof payment.amount_paid !== 'number' || payment.amount_paid <= 0) 
+    
+    // Chuyển đổi amount_paid thành số và kiểm tra
+    const amountPaid = parseFloat(payment.amount_paid);
+    if (isNaN(amountPaid) || amountPaid <= 0) {
       errors.push('Amount paid must be a positive number');
+    } else {
+      // Nếu hợp lệ, cập nhật giá trị đã chuyển đổi
+      payment.amount_paid = amountPaid;
+    }
+    
     return errors;
   }
 
@@ -38,18 +45,25 @@ class PaymentController {
 
   static async addPayment(req, res) {
     try {
-      const payment = req.body;
+      const payment = {
+        ...req.body,
+        payment_date: new Date()
+      };
       const errors = PaymentController.validatePayment(payment);
       if (errors.length > 0) {
         return res.status(400).json({ errors });
       }
 
-      const paymentId = await PaymentModel.addPayment(payment);
+      const paymentResult = await FeeModel.processPayment(payment.fee_id, payment.amount_paid);
       
-      // Cập nhật Tuition_Fees sau khi thêm thanh toán
-      await FeeModel.updateAfterPayment(payment.fee_id, payment.amount_paid);
+      const paymentId = await PaymentModel.addPayment(payment);
+      const newPayment = await PaymentModel.getPaymentById(paymentId);
 
-      res.status(201).json({ message: 'Payment added successfully', paymentId });
+      res.status(201).json({ 
+        message: 'Payment added successfully', 
+        payment: newPayment,
+        paymentResult
+      });
     } catch (error) {
       console.error('Error adding payment:', error);
       res.status(500).json({ message: 'Error adding payment', error: error.message });

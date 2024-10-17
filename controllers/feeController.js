@@ -1,5 +1,6 @@
 const FeeModel = require('../models/feeModel');
 const nodemailer = require('nodemailer');
+require('dotenv').config();
 
 class FeeController {
   static validateFee(fee) {
@@ -123,8 +124,7 @@ class FeeController {
 
   static async getUnpaidStudents(req, res) {
     try {
-      const { semesterId } = req.params;
-      const unpaidStudents = await FeeModel.getUnpaidStudents(semesterId);
+      const unpaidStudents = await FeeModel.getUnpaidStudents();
       res.status(200).json(unpaidStudents);
     } catch (error) {
       console.error('Error getting unpaid students:', error);
@@ -134,12 +134,11 @@ class FeeController {
 
   static async sendUnpaidStudentsReport(req, res) {
     try {
-      const { semesterId } = req.params;
-      const unpaidStudents = await FeeModel.getUnpaidStudents(semesterId);
+      const unpaidStudents = await FeeModel.getUnpaidStudents();
 
       // Tạo nội dung email
       const emailContent = `
-        <h2>Danh sách sinh viên chưa hoàn thành việc đóng học phí - Học kỳ ${semesterId}</h2>
+        <h2>Danh sách sinh viên chưa hoàn thành việc đóng học phí</h2>
         <table border="1">
           <tr>
             <th>Mã sinh viên</th>
@@ -160,11 +159,9 @@ class FeeController {
         </table>
       `;
 
-      // Cấu hình nodemailer (bạn cần thay đổi thông tin này)
+      // Cấu hình nodemailer
       const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
+        service: 'gmail',
         auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASS
@@ -173,9 +170,9 @@ class FeeController {
 
       // Gửi email
       await transporter.sendMail({
-        from: '"Hệ thống quản lý học phí" <your-email@gmail.com>',
-        to: 'phongdaotao@example.com',
-        subject: `Danh sách sinh viên nợ học phí - Học kỳ ${semesterId}`,
+        from: `"Hệ thống quản lý học phí" <${process.env.EMAIL_USER}>`,
+        to: 'baonguyencoder97@gmail.com', // Thay bằng email thật của phòng tài vụ
+        subject: `Danh sách sinh viên nợ học phí`,
         html: emailContent
       });
 

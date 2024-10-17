@@ -9,7 +9,7 @@ router.get('/', FeeController.getAllFees);
 router.get('/student/:studentId', FeeController.getStudentFees);
 
 // Lấy danh sách sinh viên chưa đóng học phí
-router.get('/unpaid-students/:semesterId', FeeController.getUnpaidStudents);
+router.get('/unpaid-students', FeeController.getUnpaidStudents);
 
 // Gửi báo cáo sinh viên chưa đóng học phí
 router.post('/send-unpaid-report/:semesterId', FeeController.sendUnpaidStudentsReport);
