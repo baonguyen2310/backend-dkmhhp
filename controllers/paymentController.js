@@ -1,4 +1,5 @@
 const PaymentModel = require('../models/paymentModel');
+const FeeModel = require('../models/feeModel');
 
 class PaymentController {
   static validatePayment(payment) {
@@ -44,6 +45,10 @@ class PaymentController {
       }
 
       const paymentId = await PaymentModel.addPayment(payment);
+      
+      // Cập nhật Tuition_Fees sau khi thêm thanh toán
+      await FeeModel.updateAfterPayment(payment.fee_id, payment.amount_paid);
+
       res.status(201).json({ message: 'Payment added successfully', paymentId });
     } catch (error) {
       console.error('Error adding payment:', error);
@@ -51,41 +56,7 @@ class PaymentController {
     }
   }
 
-  static async updatePayment(req, res) {
-    try {
-      const paymentId = req.params.id;
-      const payment = req.body;
-      const errors = PaymentController.validatePayment(payment);
-      if (errors.length > 0) {
-        return res.status(400).json({ errors });
-      }
-
-      const result = await PaymentModel.updatePayment(paymentId, payment);
-      if (result > 0) {
-        res.status(200).json({ message: 'Payment updated successfully' });
-      } else {
-        res.status(404).json({ message: 'Payment not found' });
-      }
-    } catch (error) {
-      console.error('Error updating payment:', error);
-      res.status(500).json({ message: 'Error updating payment', error: error.message });
-    }
-  }
-
-  static async deletePayment(req, res) {
-    try {
-      const paymentId = req.params.id;
-      const result = await PaymentModel.deletePayment(paymentId);
-      if (result > 0) {
-        res.status(200).json({ message: 'Payment deleted successfully' });
-      } else {
-        res.status(404).json({ message: 'Payment not found' });
-      }
-    } catch (error) {
-      console.error('Error deleting payment:', error);
-      res.status(500).json({ message: 'Error deleting payment', error: error.message });
-    }
-  }
+  // Xóa các phương thức updatePayment và deletePayment
 }
 
 module.exports = PaymentController;

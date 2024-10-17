@@ -11,10 +11,6 @@ router.get('/:id', PaymentController.getPaymentById);
 // Thêm một khoản thanh toán mới
 router.post('/', PaymentController.addPayment);
 
-// Cập nhật thông tin thanh toán
-router.put('/:id', PaymentController.updatePayment);
-
-// Xóa một khoản thanh toán
-router.delete('/:id', PaymentController.deletePayment);
+// Xóa các route để cập nhật và xóa thanh toán
 
 module.exports = router;

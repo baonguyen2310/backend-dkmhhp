@@ -168,3 +168,17 @@ CREATE TABLE UserRoles (
 ALTER TABLE Semesters
 ADD payment_deadline DATETIME,
     early_payment_deadline DATETIME;
+
+
+-- Step 1: Drop the existing priority column
+ALTER TABLE Students
+DROP COLUMN priority;
+
+-- Step 2: Add the new discount_id column
+ALTER TABLE Students
+ADD discount_id INT;
+
+-- Step 3: Add the foreign key constraint
+ALTER TABLE Students
+ADD CONSTRAINT FK_Students_Fee_Discounts
+FOREIGN KEY (discount_id) REFERENCES Fee_Discounts(discount_id);

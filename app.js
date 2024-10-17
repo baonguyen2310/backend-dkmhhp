@@ -9,6 +9,7 @@ const courseRegistrationRoutes = require('./routes/courseRegistrationRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const { authenticateToken, authorizeRoles } = require('./middlewares/authMiddleware');
 const paymentRoutes = require('./routes/paymentRoutes');
+const semesterRoutes = require('./routes/semesterRoutes');
 
 const app = express();
 // Sử dụng morgan middleware
@@ -32,6 +33,7 @@ app.use('/api/fees', authorizeRoles('admin', 'accounting staff'), feeRoutes);
 app.use('/api/students', authorizeRoles('admin', 'academic affairs staff'), studentRoutes);
 app.use('/api/course-registrations', authorizeRoles('admin', 'academic affairs staff'), courseRegistrationRoutes);
 app.use('/api/payments', authorizeRoles('admin', 'accounting staff'), paymentRoutes);
+app.use('/api/semesters', authorizeRoles('admin', 'academic affairs staff'), semesterRoutes);
 
 // Basic error handling middleware
 app.use((err, req, res, next) => {

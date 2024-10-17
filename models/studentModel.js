@@ -38,12 +38,12 @@ class StudentModel {
         .input('date_of_birth', sql.DateTime, new Date(student.date_of_birth))
         .input('gender', sql.NVarChar, student.gender)
         .input('hometown', sql.NVarChar, student.hometown)
-        .input('priority', sql.NVarChar, student.priority)
+        .input('discount_id', sql.Int, student.discount_id || null)
         .input('contact_address', sql.NVarChar, student.contact_address)
         .input('class_id', sql.NVarChar, student.class_id)
         .query(`
-          INSERT INTO Students (student_id, first_name, last_name, date_of_birth, gender, hometown, priority, contact_address, class_id)
-          VALUES (@student_id, @first_name, @last_name, @date_of_birth, @gender, @hometown, @priority, @contact_address, @class_id)
+          INSERT INTO Students (student_id, first_name, last_name, date_of_birth, gender, hometown, discount_id, contact_address, class_id)
+          VALUES (@student_id, @first_name, @last_name, @date_of_birth, @gender, @hometown, @discount_id, @contact_address, @class_id)
         `);
       return result.rowsAffected;
     } catch (error) {
@@ -68,13 +68,13 @@ class StudentModel {
         .input('date_of_birth', sql.DateTime, student.date_of_birth)
         .input('gender', sql.NVarChar, student.gender)
         .input('hometown', sql.NVarChar, student.hometown)
-        .input('priority', sql.NVarChar, student.priority)
+        .input('discount_id', sql.Int, student.discount_id || null)
         .input('contact_address', sql.NVarChar, student.contact_address)
         .input('class_id', sql.NVarChar, student.class_id)
         .query(`
           UPDATE Students
           SET first_name = @first_name, last_name = @last_name, date_of_birth = @date_of_birth,
-              gender = @gender, hometown = @hometown, priority = @priority, contact_address = @contact_address, class_id = @class_id
+              gender = @gender, hometown = @hometown, discount_id = @discount_id, contact_address = @contact_address, class_id = @class_id
           WHERE student_id = @student_id
         `);
       return result.rowsAffected;
@@ -119,6 +119,17 @@ class StudentModel {
       return result.recordset;
     } catch (error) {
       console.error('Error fetching classes:', error);
+      throw error;
+    }
+  }
+
+  static async getFeeDiscounts() {
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request().query('SELECT discount_id, discount_type, discount_percent FROM Fee_Discounts');
+      return result.recordset;
+    } catch (error) {
+      console.error('Error fetching fee discounts:', error);
       throw error;
     }
   }

@@ -217,7 +217,85 @@ class FeeModel {
     }
   }
 
+  static async getStudentFees(studentId) {
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request()
+        .input('student_id', sql.NVarChar, studentId)
+        .query(`
+          SELECT 
+            tf.fee_id, 
+            tf.semester_id, 
+            sem.start_date,
+            sem.end_date,
+            sem.payment_deadline,
+            sem.early_payment_deadline,
+            tf.total_credits, 
+            tf.tuition_fee, 
+            tf.discount, 
+            tf.amount_paid, 
+            tf.payment_status
+          FROM Tuition_Fees tf
+          JOIN Semesters sem ON tf.semester_id = sem.semester_id
+          WHERE tf.student_id = @student_id
+          ORDER BY tf.semester_id DESC
+        `);
+      return result.recordset;
+    } catch (error) {
+      console.error('Error fetching student fees:', error);
+      throw error;
+    }
+  }
+
+  static async getUnpaidStudents(semesterId) {
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request()
+        .input('semester_id', sql.Int, semesterId)
+        .query(`
+          SELECT 
+            s.student_id, 
+            s.first_name, 
+            s.last_name, 
+            tf.tuition_fee, 
+            tf.amount_paid, 
+            (tf.tuition_fee - tf.amount_paid) as remaining_balance
+          FROM Students s
+          JOIN Tuition_Fees tf ON s.student_id = tf.student_id
+          WHERE tf.semester_id = @semester_id AND tf.payment_status != 'Paid'
+          ORDER BY s.last_name, s.first_name
+        `);
+      return result.recordset;
+    } catch (error) {
+      console.error('Error getting unpaid students:', error);
+      throw error;
+    }
+  }
+
   // Các phương thức khác như addFee, updateFee, deleteFee có thể được thêm vào đây nếu cần
+
+  // Thêm phương thức này vào FeeModel
+
+  static async updateAfterPayment(feeId, amountPaid) {
+    try {
+      const pool = await sql.connect(dbConfig);
+      await pool.request()
+        .input('fee_id', sql.NVarChar, feeId)
+        .input('amount_paid', sql.Decimal(10, 2), amountPaid)
+        .query(`
+          UPDATE Tuition_Fees
+          SET amount_paid = amount_paid + @amount_paid,
+              payment_status = CASE
+                WHEN amount_paid + @amount_paid >= tuition_fee THEN 'Paid'
+                ELSE 'Partially Paid'
+              END
+          WHERE fee_id = @fee_id
+        `);
+    } catch (error) {
+      console.error('Error updating fee after payment:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = FeeModel;

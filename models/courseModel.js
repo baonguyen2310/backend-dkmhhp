@@ -68,11 +68,11 @@ class CourseModel {
       const result = await pool.request()
         .input('course_id', sql.NVarChar, course_id)
         .query('DELETE FROM Course WHERE course_id = @course_id');
-      return result.rowsAffected;
+      return result.rowsAffected[0];
     } catch (error) {
       console.error('Error deleting course:', error);
       if (error.number === 547) { // SQL Server error number for foreign key constraint violation
-        throw new Error('Cannot delete course due to existing related data');
+        throw new Error('Cannot delete course due to existing related data in Prerequisite_Course');
       }
       throw error;
     }

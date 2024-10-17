@@ -58,38 +58,6 @@ class PaymentModel {
       throw error;
     }
   }
-
-  static async updatePayment(paymentId, payment) {
-    try {
-      const pool = await sql.connect(dbConfig);
-      const result = await pool.request()
-        .input('payment_id', sql.Int, paymentId)
-        .input('payment_date', sql.DateTime, new Date(payment.payment_date))
-        .input('amount_paid', sql.Decimal(10, 2), payment.amount_paid)
-        .query(`
-          UPDATE Fee_Payments
-          SET payment_date = @payment_date, amount_paid = @amount_paid
-          WHERE payments_id = @payment_id
-        `);
-      return result.rowsAffected[0];
-    } catch (error) {
-      console.error('Error updating payment:', error);
-      throw error;
-    }
-  }
-
-  static async deletePayment(paymentId) {
-    try {
-      const pool = await sql.connect(dbConfig);
-      const result = await pool.request()
-        .input('payment_id', sql.Int, paymentId)
-        .query('DELETE FROM Fee_Payments WHERE payments_id = @payment_id');
-      return result.rowsAffected[0];
-    } catch (error) {
-      console.error('Error deleting payment:', error);
-      throw error;
-    }
-  }
 }
 
 module.exports = PaymentModel;

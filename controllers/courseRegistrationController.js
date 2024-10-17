@@ -94,16 +94,29 @@ class CourseRegistrationController {
       if (!studentId) return res.status(400).json({ message: 'Student ID is required' });
       if (!semesterId) return res.status(400).json({ message: 'Semester ID is required' });
 
-      // Tính toán học phí
-      const feeCalculation = await FeeModel.calculateTuitionFee(studentId, semesterId);
+      const feeCalculation = await CourseRegistrationModel.finalizeCourseRegistrations(studentId, semesterId);
 
       res.status(200).json({
-        message: 'Course registration finalized and tuition fee calculated',
+        message: 'Course registrations finalized and tuition fee calculated',
         feeDetails: feeCalculation
       });
     } catch (error) {
       console.error('Error finalizing course registration:', error);
       res.status(500).json({ message: 'Error finalizing course registration', error: error.message });
+    }
+  }
+
+  static async getRegistrationSummary(req, res) {
+    try {
+      const { studentId, semesterId } = req.query;
+      
+      // Gọi phương thức trong model để lấy thông tin tổng kết
+      const summary = await CourseRegistrationModel.getRegistrationSummary(studentId, semesterId);
+      
+      res.status(200).json(summary);
+    } catch (error) {
+      console.error('Error getting registration summary:', error);
+      res.status(500).json({ message: 'Error getting registration summary', error: error.message });
     }
   }
 }

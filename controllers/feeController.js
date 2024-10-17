@@ -26,7 +26,19 @@ class FeeController {
       res.status(200).json(fees);
     } catch (error) {
       console.error('Error fetching fees:', error);
-      res.status(500).json({ message: 'Error fetching fees' });
+      res.status(500).json({ message: 'Error fetching fees', error: error.message });
+    }
+  }
+
+  // Lấy thông tin học phí của một sinh viên
+  static async getStudentFees(req, res) {
+    try {
+      const { studentId } = req.params;
+      const fees = await FeeModel.getStudentFees(studentId);
+      res.status(200).json(fees);
+    } catch (error) {
+      console.error('Error fetching student fees:', error);
+      res.status(500).json({ message: 'Error fetching student fees', error: error.message });
     }
   }
 
@@ -154,8 +166,8 @@ class FeeController {
         port: 587,
         secure: false,
         auth: {
-          user: 'your-email@gmail.com',
-          pass: 'your-email-password'
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
         }
       });
 

@@ -248,6 +248,65 @@ class CourseRegistrationModel {
       throw error;
     }
   }
+
+  static async finalizeCourseRegistrations(studentId, semesterId) {
+    try {
+      const pool = await sql.connect(dbConfig);
+      
+      // Kiểm tra xem tất cả các đăng ký đã được xác nhận chưa
+      const allConfirmed = await this.checkAllRegistrationsConfirmed(studentId, semesterId);
+      if (!allConfirmed) {
+        throw new Error('Not all course registrations are confirmed');
+      }
+
+      // Cập nhật trạng thái đăng ký thành 'Finalized'
+      await pool.request()
+        .input('student_id', sql.NVarChar, studentId)
+        .input('semester_id', sql.Int, semesterId)
+        .query(`
+          UPDATE Course_Registration
+          SET registration_status = 'Finalized'
+          WHERE student_id = @student_id AND semester_id = @semester_id
+        `);
+
+      // Tính toán học phí
+      const feeCalculation = await FeeModel.calculateTuitionFee(studentId, semesterId);
+
+      return feeCalculation;
+    } catch (error) {
+      console.error('Error finalizing course registrations:', error);
+      throw error;
+    }
+  }
+
+  static async getRegistrationSummary(studentId, semesterId) {
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request()
+        .input('student_id', sql.NVarChar, studentId)
+        .input('semester_id', sql.Int, semesterId)
+        .query(`
+          SELECT 
+            s.first_name + ' ' + s.last_name AS studentName,
+            sem.semester_id AS semesterName,
+            COUNT(cr.course_id) AS totalCourses,
+            SUM(c.credits_num) AS totalCredits,
+            SUM(c.credits_num * fr.fee_per_credit) AS estimatedTuitionFee
+          FROM Course_Registration cr
+          JOIN Students s ON cr.student_id = s.student_id
+          JOIN Course c ON cr.course_id = c.course_id
+          JOIN Semesters sem ON cr.semester_id = sem.semester_id
+          JOIN Fee_Rates fr ON c.course_type = fr.course_type
+          WHERE cr.student_id = @student_id AND cr.semester_id = @semester_id
+          GROUP BY s.first_name, s.last_name, sem.semester_id
+        `);
+      
+      return result.recordset[0];
+    } catch (error) {
+      console.error('Error getting registration summary:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = CourseRegistrationModel;

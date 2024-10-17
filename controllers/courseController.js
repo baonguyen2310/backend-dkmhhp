@@ -85,9 +85,12 @@ class CourseController {
     } catch (error) {
       console.error('Error deleting course:', error);
       if (error.message.includes('Cannot delete course')) {
-        res.status(400).json({ message: error.message });
+        res.status(400).json({ 
+          message: 'Cannot delete course', 
+          details: 'This course is a prerequisite for other courses. Remove the prerequisite relationships before deleting.'
+        });
       } else {
-        res.status(500).json({ message: 'Error deleting course' });
+        res.status(500).json({ message: 'Error deleting course', error: error.message });
       }
     }
   }

@@ -16,4 +16,6 @@ router.delete('/:id', StudentController.deleteStudent);
 
 router.get('/classes', StudentController.getClasses);
 
+router.get('/fee-discounts', StudentController.getFeeDiscounts);
+
 module.exports = router;

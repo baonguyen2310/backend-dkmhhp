@@ -147,8 +147,8 @@ VALUES ('C110', N'Lập Trình Python', 3, 30, N'Thực hành');
 
 -- Bảng Prerequisite_Course
 INSERT INTO Prerequisite_Course (course_id, prerequisite_course_id) VALUES ('C102', 'C101');
-INSERT INTO Prerequisite_Course (course_id, prerequisite_course_id) VALUES ('C105', 'C101');
-INSERT INTO Prerequisite_Course (course_id, prerequisite_course_id) VALUES ('C106', 'C102');
+INSERT INTO Prerequisite_Course (course_id, prerequisite_course_id) VALUES ('C103', 'C101');
+INSERT INTO Prerequisite_Course (course_id, prerequisite_course_id) VALUES ('C102', 'C106');
 INSERT INTO Prerequisite_Course (course_id, prerequisite_course_id) VALUES ('C107', 'C101');
 INSERT INTO Prerequisite_Course (course_id, prerequisite_course_id) VALUES ('C108', 'C106');
 INSERT INTO Prerequisite_Course (course_id, prerequisite_course_id) VALUES ('C109', 'C107');
@@ -250,8 +250,8 @@ INSERT INTO Credit_Rules (rule_id, class_id, semester_id, min_credits, max_credi
 INSERT INTO Credit_Rules (rule_id, class_id, semester_id, min_credits, max_credits) VALUES ('CR010', 'C010', 1, 12, 24);
 
 -- Bảng Fee_Rates
-INSERT INTO Fee_Rates (course_type, fee_per_credit) VALUES (N'Lý thuyết', 1000000);
-INSERT INTO Fee_Rates (course_type, fee_per_credit) VALUES (N'Thực hành', 1200000);
+INSERT INTO Fee_Rates (course_type, fee_per_credit) VALUES (N'Lý thuyết', 27000);
+INSERT INTO Fee_Rates (course_type, fee_per_credit) VALUES (N'Thực hành', 37000);
 INSERT INTO Fee_Rates (course_type, fee_per_credit) VALUES (N'Đồ án', 1500000);
 INSERT INTO Fee_Rates (course_type, fee_per_credit) VALUES (N'Thực tập', 800000);
 INSERT INTO Fee_Rates (course_type, fee_per_credit) VALUES (N'Seminar', 1100000);
@@ -310,3 +310,7 @@ INSERT INTO UserRoles (user_id, role_id) VALUES ('user_admin', 1);
 INSERT INTO UserRoles (user_id, role_id) VALUES ('user_student', 2);
 INSERT INTO UserRoles (user_id, role_id) VALUES ('user_accounting', 3);
 INSERT INTO UserRoles (user_id, role_id) VALUES ('user_academic', 4);
+
+
+
+

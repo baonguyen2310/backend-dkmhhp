@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const bcrypt = require('bcrypt');
 const dbConfig = require('../config/dbConfig');
+const { v4: uuidv4 } = require('uuid'); // Add this at the top of your file
 
 class AuthModel {
   // Verify user credentials
@@ -56,12 +57,13 @@ class AuthModel {
     }
   }
 
-  // Create a new user
+  // Create a new user and assign a default role
   static async createUser(user) {
     try {
       const pool = await sql.connect(dbConfig);
+      const userId = user.userId || uuidv4(); // Generate a UUID if userId is not provided
       const result = await pool.request()
-        .input('userId', sql.NVarChar, user.userId) // Use the userId from the user object
+        .input('userId', sql.NVarChar, userId)
         .input('username', sql.NVarChar, user.username)
         .input('passwordHash', sql.NVarChar, user.passwordHash)
         .input('email', sql.NVarChar, user.email)
@@ -72,33 +74,18 @@ class AuthModel {
           OUTPUT INSERTED.user_id
           VALUES (@userId, @username, @passwordHash, @email, @firstName, @lastName)
         `);
-      return result.recordset[0];
+
+      const createdUserId = result.recordset[0].user_id;
+
+      // Assign default role with role_id = 2
+      await pool.request()
+        .input('userId', sql.NVarChar, createdUserId)
+        .input('roleId', sql.Int, 2) // Default role_id
+        .query('INSERT INTO UserRoles (user_id, role_id) VALUES (@userId, @roleId)');
+
+      return createdUserId;
     } catch (error) {
       console.error('Error creating user:', error);
-      throw error;
-    }
-  }
-
-  // Assign role to user
-  static async assignRoleToUser(userId, roleName) {
-    try {
-      const pool = await sql.connect(dbConfig);
-      const roleResult = await pool.request()
-        .input('roleName', sql.NVarChar, roleName)
-        .query('SELECT role_id FROM Roles WHERE role_name = @roleName');
-      
-      if (roleResult.recordset.length === 0) {
-        throw new Error('Role not found');
-      }
-
-      const roleId = roleResult.recordset[0].role_id;
-
-      await pool.request()
-        .input('userId', sql.NVarChar, userId)
-        .input('roleId', sql.Int, roleId)
-        .query('INSERT INTO UserRoles (user_id, role_id) VALUES (@userId, @roleId)');
-    } catch (error) {
-      console.error('Error assigning role to user:', error);
       throw error;
     }
   }

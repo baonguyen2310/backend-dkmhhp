@@ -5,16 +5,13 @@ const FeeController = require('../controllers/feeController');
 // Lấy tất cả các khoản học phí
 router.get('/', FeeController.getAllFees);
 
-// Thêm một khoản học phí mới
-router.post('/', FeeController.addFee);
+// Lấy thông tin học phí của một sinh viên
+router.get('/student/:studentId', FeeController.getStudentFees);
 
-// Cập nhật thông tin học phí
-router.put('/:id', FeeController.updateFee);
-
-// Xóa một khoản học phí
-router.delete('/:id', FeeController.deleteFee);
-
+// Lấy danh sách sinh viên chưa đóng học phí
 router.get('/unpaid-students/:semesterId', FeeController.getUnpaidStudents);
+
+// Gửi báo cáo sinh viên chưa đóng học phí
 router.post('/send-unpaid-report/:semesterId', FeeController.sendUnpaidStudentsReport);
 
 module.exports = router;

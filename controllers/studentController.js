@@ -36,6 +36,11 @@ class StudentController {
     if (!student.gender || !['Male', 'Female'].includes(student.gender)) {
       errors.push('Gender must be Male or Female');
     }
+    if (student.discount_id !== null && student.discount_id !== undefined) {
+      if (!Number.isInteger(Number(student.discount_id))) {
+        errors.push('Discount ID must be an integer');
+      }
+    }
     // Thêm các validation khác nếu cần
 
     return errors;
@@ -124,6 +129,16 @@ class StudentController {
     } catch (error) {
       console.error('Error fetching classes:', error);
       res.status(500).json({ message: 'Error fetching classes' });
+    }
+  }
+
+  static async getFeeDiscounts(req, res) {
+    try {
+      const feeDiscounts = await StudentModel.getFeeDiscounts();
+      res.status(200).json(feeDiscounts);
+    } catch (error) {
+      console.error('Error fetching fee discounts:', error);
+      res.status(500).json({ message: 'Error fetching fee discounts' });
     }
   }
 }

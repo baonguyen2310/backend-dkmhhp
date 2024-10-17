@@ -55,10 +55,7 @@ class AuthController {
         firstName,
         lastName
       });
-
-      // Assign the specified role to the new user
-      await AuthModel.assignRoleToUser(newUser.user_id, role);
-
+      
       res.status(201).json({ message: 'User created successfully', userId: newUser.user_id });
     } catch (error) {
       console.error('Error during signup:', error);
