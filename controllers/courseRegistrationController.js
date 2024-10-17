@@ -2,6 +2,16 @@ const CourseRegistrationModel = require('../models/courseRegistrationModel');
 const FeeModel = require('../models/feeModel');
 
 class CourseRegistrationController {
+  static validateCourseRegistration(registration) {
+    const errors = [];
+    if (!registration.student_id) errors.push('Student ID is required');
+    if (!registration.course_id) errors.push('Course ID is required');
+    if (!registration.semester_id) errors.push('Semester ID is required');
+    if (!['Pending', 'Confirmed', 'Cancelled'].includes(registration.registration_status)) 
+      errors.push('Registration status must be Pending, Confirmed, or Cancelled');
+    return errors;
+  }
+
   static async getAllCourseRegistrations(req, res) {
     try {
       const courseRegistrations = await CourseRegistrationModel.getAllCourseRegistrations();
@@ -15,6 +25,11 @@ class CourseRegistrationController {
   static async addCourseRegistration(req, res) {
     try {
       const registration = req.body;
+      const errors = CourseRegistrationController.validateCourseRegistration(registration);
+      if (errors.length > 0) {
+        return res.status(400).json({ errors });
+      }
+
       const result = await CourseRegistrationModel.addCourseRegistration(registration);
       if (result > 0) {
         res.status(201).json({ message: 'Course registration added successfully' });
@@ -23,7 +38,11 @@ class CourseRegistrationController {
       }
     } catch (error) {
       console.error('Error adding course registration:', error);
-      res.status(400).json({ message: error.message });
+      if (error.message === 'Course registration already exists') {
+        res.status(400).json({ message: 'Course registration already exists' });
+      } else {
+        res.status(500).json({ message: 'Error adding course registration', error: error.message });
+      }
     }
   }
 
@@ -31,10 +50,14 @@ class CourseRegistrationController {
     try {
       const registrationId = req.params.id;
       const registration = req.body;
+      const errors = CourseRegistrationController.validateCourseRegistration(registration);
+      if (errors.length > 0) {
+        return res.status(400).json({ errors });
+      }
+
       const result = await CourseRegistrationModel.updateCourseRegistration(registrationId, registration);
       
       if (typeof result === 'object' && result.tuitionFee) {
-        // Nếu kết quả là object chứa thông tin học phí
         res.status(200).json({ 
           message: 'Course registration confirmed and tuition fee calculated',
           feeDetails: result
@@ -68,8 +91,8 @@ class CourseRegistrationController {
   static async finalizeCourseRegistration(req, res) {
     try {
       const { studentId, semesterId } = req.body;
-
-      // Kiểm tra xem việc đăng ký đã hoàn tất chưa (có thể thêm logic kiểm tra ở đây)
+      if (!studentId) return res.status(400).json({ message: 'Student ID is required' });
+      if (!semesterId) return res.status(400).json({ message: 'Semester ID is required' });
 
       // Tính toán học phí
       const feeCalculation = await FeeModel.calculateTuitionFee(studentId, semesterId);

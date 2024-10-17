@@ -17,7 +17,20 @@ class StudentModel {
   // Thêm một sinh viên mới
   static async addStudent(student) {
     try {
+      const isValidClass = await this.validateClassId(student.class_id);
+      if (!isValidClass) {
+        throw new Error('Invalid class_id');
+      }
+
       const pool = await sql.connect(dbConfig);
+      const existingStudent = await pool.request()
+        .input('student_id', sql.NVarChar, student.student_id)
+        .query('SELECT COUNT(*) as count FROM Students WHERE student_id = @student_id');
+
+      if (existingStudent.recordset[0].count > 0) {
+        throw new Error('Student ID already exists');
+      }
+
       const result = await pool.request()
         .input('student_id', sql.NVarChar, student.student_id)
         .input('first_name', sql.NVarChar, student.first_name)
@@ -27,9 +40,10 @@ class StudentModel {
         .input('hometown', sql.NVarChar, student.hometown)
         .input('priority', sql.NVarChar, student.priority)
         .input('contact_address', sql.NVarChar, student.contact_address)
+        .input('class_id', sql.NVarChar, student.class_id)
         .query(`
-          INSERT INTO Students (student_id, first_name, last_name, date_of_birth, gender, hometown, priority, contact_address)
-          VALUES (@student_id, @first_name, @last_name, @date_of_birth, @gender, @hometown, @priority, @contact_address)
+          INSERT INTO Students (student_id, first_name, last_name, date_of_birth, gender, hometown, priority, contact_address, class_id)
+          VALUES (@student_id, @first_name, @last_name, @date_of_birth, @gender, @hometown, @priority, @contact_address, @class_id)
         `);
       return result.rowsAffected;
     } catch (error) {
@@ -41,6 +55,11 @@ class StudentModel {
   // Cập nhật thông tin sinh viên
   static async updateStudent(student_id, student) {
     try {
+      const isValidClass = await this.validateClassId(student.class_id);
+      if (!isValidClass) {
+        throw new Error('Invalid class_id');
+      }
+
       const pool = await sql.connect(dbConfig);
       const result = await pool.request()
         .input('student_id', sql.NVarChar, student_id)
@@ -77,6 +96,30 @@ class StudentModel {
       console.error('Error deleting student:', error);
       // Ném lỗi với thông báo cụ thể
       throw new Error('Cannot delete student due to existing related data');
+    }
+  }
+
+  static async validateClassId(class_id) {
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request()
+        .input('class_id', sql.NVarChar, class_id)
+        .query('SELECT COUNT(*) as count FROM Class WHERE class_id = @class_id');
+      return result.recordset[0].count > 0;
+    } catch (error) {
+      console.error('Error validating class_id:', error);
+      throw error;
+    }
+  }
+
+  static async getClasses() {
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request().query('SELECT class_id, class_name FROM Class');
+      return result.recordset;
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+      throw error;
     }
   }
 }

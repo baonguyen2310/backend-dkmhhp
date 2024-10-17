@@ -7,6 +7,15 @@ class CourseRegistrationModel {
 
   static async addCourseRegistration(registration) {
     try {
+      const exists = await this.checkRegistrationExists(
+        registration.student_id, 
+        registration.course_id, 
+        registration.semester_id
+      );
+      if (exists) {
+        throw new Error('Course registration already exists');
+      }
+
       const pool = await sql.connect(dbConfig);
 
       // Kiểm tra môn tiên quyết
@@ -29,9 +38,15 @@ class CourseRegistrationModel {
         .input('registration_status', sql.NVarChar, 'Registered')
         .query(`
           INSERT INTO Course_Registration (student_id, course_id, semester_id, registration_status)
+          OUTPUT INSERTED.registration_id
           VALUES (@student_id, @course_id, @semester_id, @registration_status)
         `);
-      return result.rowsAffected;
+      
+      if (result.recordset.length > 0) {
+        return result.recordset[0].registration_id;
+      } else {
+        throw new Error('Failed to insert course registration');
+      }
     } catch (error) {
       console.error('Database error:', error);
       throw error;
@@ -69,10 +84,10 @@ class CourseRegistrationModel {
         .input('semester_id', sql.Int, semesterId)
         .query(`
           SELECT SUM(c.credits_num) as total_credits, cr.max_credits
-          FROM Course_Registration cr
-          JOIN Course c ON cr.course_id = c.course_id
+          FROM Course_Registration reg
+          JOIN Course c ON reg.course_id = c.course_id
           JOIN Credit_Rules cr ON cr.class_id = (SELECT class_id FROM Students WHERE student_id = @student_id)
-          WHERE cr.student_id = @student_id AND cr.semester_id = @semester_id AND cr.semester_id = @semester_id
+          WHERE reg.student_id = @student_id AND reg.semester_id = @semester_id
           GROUP BY cr.max_credits
         `);
       
@@ -89,27 +104,32 @@ class CourseRegistrationModel {
     }
   }
 
-  static async updateCourseRegistration(registrationId, registration) {
+  static async updateCourseRegistration(registrationId, newStatus) {
     try {
-      const pool = await sql.connect(dbConfig);
-      
-      // Kiểm tra thời gian chỉnh sửa
-      const editCheck = await this.checkEditPeriod(registrationId);
-      if (!editCheck.success) {
-        throw new Error(editCheck.message);
+      if (!registrationId || isNaN(registrationId)) {
+        throw new Error('Invalid registration ID');
       }
 
-      // Cập nhật đăng ký
+      const editPeriodCheck = await this.checkEditPeriod(registrationId);
+      if (!editPeriodCheck.success) {
+        throw new Error(editPeriodCheck.message);
+      }
+
+      const pool = await sql.connect(dbConfig);
       const result = await pool.request()
         .input('registration_id', sql.Int, registrationId)
-        .input('course_id', sql.NVarChar, registration.course_id)
-        .input('registration_status', sql.NVarChar, registration.registration_status)
+        .input('new_status', sql.NVarChar, newStatus)
         .query(`
           UPDATE Course_Registration
-          SET course_id = @course_id, registration_status = @registration_status
+          SET registration_status = @new_status
           WHERE registration_id = @registration_id
         `);
-      return result.rowsAffected;
+
+      if (result.rowsAffected[0] === 0) {
+        throw new Error('Course registration not found');
+      }
+
+      return { success: true, message: 'Course registration updated successfully' };
     } catch (error) {
       console.error('Error updating course registration:', error);
       throw error;
@@ -118,6 +138,10 @@ class CourseRegistrationModel {
 
   static async checkEditPeriod(registrationId) {
     try {
+      if (!registrationId || isNaN(registrationId)) {
+        throw new Error('Invalid registration ID');
+      }
+
       const pool = await sql.connect(dbConfig);
       const result = await pool.request()
         .input('registration_id', sql.Int, registrationId)
@@ -128,12 +152,14 @@ class CourseRegistrationModel {
           WHERE cr.registration_id = @registration_id
         `);
       
-      if (result.recordset.length > 0) {
-        const { registration_date, registration_deadline } = result.recordset[0];
-        const now = new Date();
-        if (now > registration_deadline) {
-          return { success: false, message: 'Edit period has ended' };
-        }
+      if (result.recordset.length === 0) {
+        throw new Error('Course registration not found');
+      }
+
+      const { registration_date, registration_deadline } = result.recordset[0];
+      const now = new Date();
+      if (now > registration_deadline) {
+        return { success: false, message: 'Edit period has ended' };
       }
       return { success: true };
     } catch (error) {
@@ -185,6 +211,40 @@ class CourseRegistrationModel {
       return result.recordset;
     } catch (error) {
       console.error('Error fetching course registrations:', error);
+      throw error;
+    }
+  }
+
+  static async checkRegistrationExists(studentId, courseId, semesterId) {
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request()
+        .input('student_id', sql.NVarChar, studentId)
+        .input('course_id', sql.NVarChar, courseId)
+        .input('semester_id', sql.Int, semesterId)
+        .query(`
+          SELECT COUNT(*) as count 
+          FROM Course_Registration 
+          WHERE student_id = @student_id 
+            AND course_id = @course_id 
+            AND semester_id = @semester_id
+        `);
+      return result.recordset[0].count > 0;
+    } catch (error) {
+      console.error('Error checking registration existence:', error);
+      throw error;
+    }
+  }
+
+  static async deleteCourseRegistration(registrationId) {
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request()
+        .input('registration_id', sql.Int, registrationId)
+        .query('DELETE FROM Course_Registration WHERE registration_id = @registration_id');
+      return result.rowsAffected[0];
+    } catch (error) {
+      console.error('Error deleting course registration:', error);
       throw error;
     }
   }

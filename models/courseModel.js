@@ -17,6 +17,10 @@ class CourseModel {
   // Thêm một môn học mới
   static async addCourse(course) {
     try {
+      const exists = await this.checkCourseExists(course.course_id);
+      if (exists) {
+        throw new Error('Course ID already exists');
+      }
       const pool = await sql.connect(dbConfig);
       const result = await pool.request()
         .input('course_id', sql.NVarChar, course.course_id)
@@ -24,10 +28,9 @@ class CourseModel {
         .input('credits_num', sql.Int, course.credits_num)
         .input('lesson_num', sql.Int, course.lesson_num)
         .input('course_type', sql.NVarChar, course.course_type)
-        .input('department_id', sql.NVarChar, course.department_id)
         .query(`
-          INSERT INTO Course (course_id, course_name, credits_num, lesson_num, course_type, department_id)
-          VALUES (@course_id, @course_name, @credits_num, @lesson_num, @course_type, @department_id)
+          INSERT INTO Course (course_id, course_name, credits_num, lesson_num, course_type)
+          VALUES (@course_id, @course_name, @credits_num, @lesson_num, @course_type)
         `);
       return result.rowsAffected;
     } catch (error) {
@@ -46,10 +49,9 @@ class CourseModel {
         .input('credits_num', sql.Int, course.credits_num)
         .input('lesson_num', sql.Int, course.lesson_num)
         .input('course_type', sql.NVarChar, course.course_type)
-        .input('department_id', sql.NVarChar, course.department_id)
         .query(`
           UPDATE Course
-          SET course_name = @course_name, credits_num = @credits_num, lesson_num = @lesson_num, course_type = @course_type, department_id = @department_id
+          SET course_name = @course_name, credits_num = @credits_num, lesson_num = @lesson_num, course_type = @course_type
           WHERE course_id = @course_id
         `);
       return result.rowsAffected;
@@ -69,6 +71,22 @@ class CourseModel {
       return result.rowsAffected;
     } catch (error) {
       console.error('Error deleting course:', error);
+      if (error.number === 547) { // SQL Server error number for foreign key constraint violation
+        throw new Error('Cannot delete course due to existing related data');
+      }
+      throw error;
+    }
+  }
+
+  static async checkCourseExists(course_id) {
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request()
+        .input('course_id', sql.NVarChar, course_id)
+        .query('SELECT COUNT(*) as count FROM Course WHERE course_id = @course_id');
+      return result.recordset[0].count > 0;
+    } catch (error) {
+      console.error('Error checking course existence:', error);
       throw error;
     }
   }

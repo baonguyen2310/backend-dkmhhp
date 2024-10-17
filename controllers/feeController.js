@@ -2,6 +2,23 @@ const FeeModel = require('../models/feeModel');
 const nodemailer = require('nodemailer');
 
 class FeeController {
+  static validateFee(fee) {
+    const errors = [];
+    if (!fee.student_id) errors.push('Student ID is required');
+    if (!fee.semester_id) errors.push('Semester ID is required');
+    if (typeof fee.total_credits !== 'number' || fee.total_credits <= 0) 
+      errors.push('Total credits must be a positive number');
+    if (typeof fee.tuition_fee !== 'number' || fee.tuition_fee < 0) 
+      errors.push('Tuition fee must be a non-negative number');
+    if (fee.discount && (typeof fee.discount !== 'number' || fee.discount < 0)) 
+      errors.push('Discount must be a non-negative number');
+    if (fee.amount_paid && (typeof fee.amount_paid !== 'number' || fee.amount_paid < 0)) 
+      errors.push('Amount paid must be a non-negative number');
+    if (!['Unpaid', 'Partially Paid', 'Paid'].includes(fee.payment_status)) 
+      errors.push('Payment status must be Unpaid, Partially Paid, or Paid');
+    return errors;
+  }
+
   // Lấy tất cả các khoản học phí
   static async getAllFees(req, res) {
     try {
@@ -17,6 +34,11 @@ class FeeController {
   static async addFee(req, res) {
     try {
       const fee = req.body;
+      const errors = FeeController.validateFee(fee);
+      if (errors.length > 0) {
+        return res.status(400).json({ errors });
+      }
+
       const result = await FeeModel.addFee(fee);
       if (result > 0) {
         res.status(201).json({ message: 'Fee added successfully' });
@@ -34,6 +56,11 @@ class FeeController {
     try {
       const feeId = req.params.id;
       const fee = req.body;
+      const errors = FeeController.validateFee(fee);
+      if (errors.length > 0) {
+        return res.status(400).json({ errors });
+      }
+
       const result = await FeeModel.updateFee(feeId, fee);
       if (result > 0) {
         res.status(200).json({ message: 'Fee updated successfully' });
@@ -65,6 +92,12 @@ class FeeController {
   static async makePayment(req, res) {
     try {
       const { feeId, amount, paymentDate } = req.body;
+      if (!feeId) return res.status(400).json({ message: 'Fee ID is required' });
+      if (typeof amount !== 'number' || amount <= 0) 
+        return res.status(400).json({ message: 'Amount must be a positive number' });
+      if (!paymentDate || isNaN(new Date(paymentDate).getTime())) 
+        return res.status(400).json({ message: 'Valid payment date is required' });
+
       const result = await FeeModel.makePayment(feeId, amount, paymentDate);
       res.status(200).json({
         message: 'Payment processed successfully',

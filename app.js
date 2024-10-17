@@ -1,13 +1,18 @@
 const express = require('express');
+const morgan = require('morgan');
 const cors = require('cors');
 require('dotenv').config();
-const app = express();
 const authRoutes = require('./routes/authRoutes');
 const courseRoutes = require('./routes/courseRoutes');
 const feeRoutes = require('./routes/feeRoutes');
 const courseRegistrationRoutes = require('./routes/courseRegistrationRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const { authenticateToken, authorizeRoles } = require('./middlewares/authMiddleware');
+const paymentRoutes = require('./routes/paymentRoutes');
+
+const app = express();
+// Sử dụng morgan middleware
+app.use(morgan('dev'));
 
 // Sử dụng cors middleware để cho phép tất cả các nguồn
 app.use(cors());
@@ -26,6 +31,7 @@ app.use('/api/courses', authorizeRoles('admin', 'academic affairs staff'), cours
 app.use('/api/fees', authorizeRoles('admin', 'accounting staff'), feeRoutes);
 app.use('/api/students', authorizeRoles('admin', 'academic affairs staff'), studentRoutes);
 app.use('/api/course-registrations', authorizeRoles('admin', 'academic affairs staff'), courseRegistrationRoutes);
+app.use('/api/payments', authorizeRoles('admin', 'accounting staff'), paymentRoutes);
 
 // Basic error handling middleware
 app.use((err, req, res, next) => {
